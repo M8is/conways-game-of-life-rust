@@ -1,14 +1,9 @@
 /// Represents a single cell in Conway's Game of Life.
 pub struct Cell {
-    alive: bool,
+    pub alive: bool,
 }
 
 impl Cell {
-    /// Creates a new cell in the given state.
-    pub fn new(alive: bool) -> Cell {
-        Cell { alive }
-    }
-
     /// Updates the cells state according to the rules of Conways Game of Life.
     /// The rules are as follows:
     /// 1. Any live cell with fewer than two live neighbours dies, as if by underpopulation.
@@ -16,12 +11,7 @@ impl Cell {
     /// 3. Any live cell with more than three live neighbours dies, as if by overpopulation.
     /// 4. Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
     pub fn update(&mut self, n: u8) {
-        self.alive = n == 3 || (self.is_alive() && n == 2);
-    }
-
-    /// Returns if the cell is currently alive.
-    pub fn is_alive(&self) -> bool {
-        self.alive
+        self.alive = n == 3 || (self.alive && n == 2);
     }
 }
 
@@ -34,8 +24,8 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let (state, neighbors, expected) = $value;
-                    let mut cell = Cell::new(state);
+                    let (alive, neighbors, expected) = $value;
+                    let mut cell = Cell { alive };
 
                     cell.update(neighbors);
 
