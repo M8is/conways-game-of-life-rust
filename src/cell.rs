@@ -1,6 +1,17 @@
 /// Represents a single cell in Conway's Game of Life.
+#[derive(PartialEq)]
 pub struct Cell {
     pub alive: bool,
+}
+
+impl std::fmt::Debug for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.alive {
+            write!(f, "O")
+        } else {
+            write!(f, "X")
+        }
+    }
 }
 
 impl Cell {
