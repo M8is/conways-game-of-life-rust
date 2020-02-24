@@ -4,6 +4,7 @@ use crate::cell;
 pub struct CellGrid {
     cells: Vec<cell::Cell>,
     dim: usize,
+    alive_cells: Vec<(usize, usize)>,
 }
 
 impl std::fmt::Debug for CellGrid {
@@ -22,7 +23,11 @@ impl CellGrid {
         for _ in 0..(dim * dim) {
             cells.push(cell::Cell { alive: false });
         }
-        CellGrid { cells, dim }
+        CellGrid {
+            cells,
+            dim,
+            alive_cells: Vec::new(),
+        }
     }
 
     /// Forces the cell at coordinates (x,y) to change its state.
@@ -41,6 +46,26 @@ impl CellGrid {
         for (i, cell) in self.cells.iter_mut().enumerate() {
             cell.update(alive_neighbors[i]);
         }
+    }
+
+    /// Gets the dimensions of the grid.
+    /// Note that the size of both dimensions is constant and the same.
+    /// Thus, only one number is returned.
+    pub fn get_dim(&self) -> usize {
+        self.dim
+    }
+
+    /// Gets the locations of all alive cells in the grid.
+    pub fn get_alive_cells(&self) -> Vec<(usize, usize)> {
+        let mut alive_cells = Vec::new();
+        for (i, cell) in self.cells.iter().enumerate() {
+            if cell.alive {
+                let x = i % self.dim;
+                let y = i / self.dim;
+                alive_cells.push((x, y));
+            }
+        }
+        alive_cells
     }
 
     /// Gets the number of alive neighbors
@@ -195,5 +220,26 @@ mod tests {
         expected.toggle(2, 1);
         expected.toggle(2, 2);
         assert_eq!(grid, expected);
+    }
+
+    #[test]
+    fn returns_dimension() {
+        let grid = CellGrid::new(8);
+        assert_eq!(grid.get_dim(), 8);
+    }
+
+    #[test]
+    fn returns_alive_cells() {
+        let mut grid = CellGrid::new(4);
+        grid.toggle(0, 0);
+        grid.toggle(2, 0);
+        grid.toggle(1, 1);
+        grid.toggle(2, 1);
+        grid.toggle(0, 2);
+        grid.toggle(2, 3);
+
+        let actual = grid.get_alive_cells();
+
+        assert_eq!(actual, vec![(0, 0), (2, 0), (1, 1), (2, 1), (0, 2), (2, 3)]);
     }
 }
