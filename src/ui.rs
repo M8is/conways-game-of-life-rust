@@ -1,40 +1,73 @@
 use std::io::{Error, Write};
-use tui::{
-    backend::TermionBackend,
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Dataset, Widget},
-    Terminal,
+use termion::{
+    clear, color, cursor,
+    raw::{IntoRawMode, RawTerminal},
+    style,
 };
 
 pub struct TUI<W>
 where
     W: Write,
 {
-    terminal: Terminal<TermionBackend<W>>,
+    terminal: RawTerminal<W>,
+    pub size: u16,
 }
 
 impl<W> TUI<W>
 where
     W: Write,
 {
-    /// Creates a new TUI
-    pub fn new(out: W) -> Result<TUI<W>, Error> {
-        let terminal = Terminal::new(TermionBackend::new(out))?;
-        Ok(TUI { terminal })
+    /// Creates a new TUI with a squared grid of the given size
+    pub fn new(out: W, size: u16) -> Result<TUI<W>, Error> {
+        let terminal = out.into_raw_mode()?;
+        let mut tui = TUI { terminal, size };
+        tui.clear()?;
+        Ok(tui)
     }
 
-    pub fn render(&mut self, grid: Vec<(usize, usize)>, n: usize) -> Result<(), Error> {
-        self.terminal.draw(|mut f| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
-                .split(f.size());
-            Dataset::default().name("Alive Cells").data(grid);
-            Block::default()
-                .title("Conways Game of Life")
-                .borders(Borders::ALL)
-                .render(&mut f, chunks[1]);
-        })
+    pub fn clear(&mut self) -> Result<(), Error> {
+        write!(self.terminal, "{}", clear::All)?;
+        for x in 0..self.size {
+            for y in 0..self.size {
+                self.set_point(x, y, false)?;
+            }
+        }
+        self.flush()?;
+        Ok(())
+    }
+
+    /// Ensure the UI is up-to-date
+    pub fn flush(&mut self) -> Result<(), Error> {
+        write!(
+            self.terminal,
+            "{}",
+            cursor::Goto(self.size + 1, self.size + 1)
+        )?;
+        self.terminal.flush()
+    }
+
+    /// Shows the given point as active or inactive
+    pub fn set_point(&mut self, x: u16, y: u16, active: bool) -> Result<(), Error> {
+        if active {
+            write!(
+                self.terminal,
+                "{}{}{}{}{}",
+                cursor::Goto(x + 1, y + 1),
+                color::Fg(color::White),
+                style::Bold,
+                "O",
+                style::Reset,
+            )
+        } else {
+            write!(
+                self.terminal,
+                "{}{}{}{}",
+                cursor::Goto(x + 1, y + 1),
+                color::Fg(color::Black),
+                "X",
+                style::Reset,
+            )
+        }
     }
 }
 
@@ -46,7 +79,7 @@ mod tui_tests {
     #[test]
     fn initializes() -> Result<(), Error> {
         let c = Cursor::new(Vec::new());
-        let _tui = TUI::new(c)?;
+        let _tui = TUI::new(c, 16)?;
         Ok(())
     }
 }
