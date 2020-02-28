@@ -25,6 +25,7 @@ where
         Ok(tui)
     }
 
+    /// Clears the screen (includes flush).
     pub fn clear(&mut self) -> Result<(), Error> {
         write!(self.terminal, "{}", clear::All)?;
         for x in 0..self.size {
