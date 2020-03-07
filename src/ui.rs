@@ -1,6 +1,6 @@
 use std::io::{Error, Write};
 use termion::{
-    clear, color, cursor,
+    clear, cursor,
     raw::{IntoRawMode, RawTerminal},
     style,
 };
@@ -10,7 +10,7 @@ where
     W: Write,
 {
     terminal: RawTerminal<W>,
-    pub size: u16,
+    size: u16,
 }
 
 impl<W> TUI<W>
@@ -19,56 +19,43 @@ where
 {
     /// Creates a new TUI with a squared grid of the given size
     pub fn new(out: W, size: u16) -> Result<TUI<W>, Error> {
-        let terminal = out.into_raw_mode()?;
-        let mut tui = TUI { terminal, size };
-        tui.clear()?;
+        let mut terminal = out.into_raw_mode()?;
+        write!(terminal, "{}", clear::All)?;
+        let tui = TUI { terminal, size };
         Ok(tui)
     }
 
-    /// Clears the screen (includes flush).
-    pub fn clear(&mut self) -> Result<(), Error> {
-        write!(self.terminal, "{}", clear::All)?;
-        for x in 0..self.size {
-            for y in 0..self.size {
-                self.set_point(x, y, false)?;
-            }
-        }
-        self.flush()?;
-        Ok(())
-    }
+    /// Draws the grid
+    pub fn draw(&mut self, grid: Vec<bool>) -> Result<(), Error> {
+        let alive_repr = format!("{}{}{}", style::Bold, "O", style::Reset);
+        let dead_repr = " ";
+        let repr = grid
+            .iter()
+            .enumerate()
+            .fold(String::new(), |acc, (i, alive)| {
+                let value_repr = if *alive {
+                    acc + &alive_repr
+                } else {
+                    acc + dead_repr
+                };
+                if i > 0 && i % self.size as usize == 0 {
+                    format!("{}{}", value_repr, "\r\n")
+                } else {
+                    value_repr
+                }
+            });
 
-    /// Ensure the UI is up-to-date
-    pub fn flush(&mut self) -> Result<(), Error> {
-        write!(
-            self.terminal,
-            "{}",
-            cursor::Goto(self.size + 1, self.size + 1)
-        )?;
+        write!(self.terminal, "{}{}", cursor::Goto(1, 1), repr)?;
         self.terminal.flush()
     }
+}
 
-    /// Shows the given point as active or inactive
-    pub fn set_point(&mut self, x: u16, y: u16, active: bool) -> Result<(), Error> {
-        if active {
-            write!(
-                self.terminal,
-                "{}{}{}{}{}",
-                cursor::Goto(x + 1, y + 1),
-                color::Fg(color::White),
-                style::Bold,
-                "O",
-                style::Reset,
-            )
-        } else {
-            write!(
-                self.terminal,
-                "{}{}{}{}",
-                cursor::Goto(x + 1, y + 1),
-                color::Fg(color::Black),
-                "X",
-                style::Reset,
-            )
-        }
+impl<W> Drop for TUI<W>
+where
+    W: Write,
+{
+    fn drop(&mut self) {
+        write!(self.terminal, "{}{}", cursor::Goto(1, 1), clear::All).unwrap();
     }
 }
 

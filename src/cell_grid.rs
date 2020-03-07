@@ -4,7 +4,13 @@ use crate::cell;
 pub struct CellGrid {
     cells: Vec<cell::Cell>,
     dim: usize,
-    alive_cells: Vec<(usize, usize)>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct OutOfBoundsError {
+    size: usize,
+    x: usize,
+    y: usize,
 }
 
 impl std::fmt::Debug for CellGrid {
@@ -23,17 +29,22 @@ impl CellGrid {
         for _ in 0..(dim * dim) {
             cells.push(cell::Cell { alive: false });
         }
-        CellGrid {
-            cells,
-            dim,
-            alive_cells: Vec::new(),
-        }
+        CellGrid { cells, dim }
     }
 
     /// Forces the cell at coordinates (x,y) to change its state.
-    pub fn toggle(&mut self, x: usize, y: usize) {
-        let i = x + self.dim * y;
+    /// Returns an error if coordinates are out of bounds.
+    pub fn toggle(&mut self, x: usize, y: usize) -> Result<(), OutOfBoundsError> {
+        if x >= self.dim || y >= self.dim {
+            return Err(OutOfBoundsError {
+                size: self.dim,
+                x,
+                y,
+            });
+        }
+        let i = self.to_single_dim(x, y);
         self.cells[i].alive = !self.cells[i].alive;
+        Ok(())
     }
 
     /// Updates all cell states in the grid, according to the cell's update rules.
@@ -56,23 +67,14 @@ impl CellGrid {
     }
 
     /// Gets the locations of all alive cells in the grid.
-    pub fn get_alive_cells(&self) -> Vec<(usize, usize)> {
-        let mut alive_cells = Vec::new();
-        for (i, cell) in self.cells.iter().enumerate() {
-            if cell.alive {
-                let x = i % self.dim;
-                let y = i / self.dim;
-                alive_cells.push((x, y));
-            }
-        }
-        alive_cells
+    pub fn get_states(&self) -> Vec<bool> {
+        self.cells.iter().map(|cell| cell.alive).collect()
     }
 
     /// Gets the number of alive neighbors
     fn get_alive_neighbors(&self, i: usize) -> u8 {
         let mut n = 0;
-        let x = i % self.dim;
-        let y = i / self.dim;
+        let (x, y) = self.to_dual_dim(i);
         if x > 0 {
             // Check left
             if self.cells[i - 1].alive {
@@ -131,6 +133,14 @@ impl CellGrid {
 
         n
     }
+
+    fn to_single_dim(&self, x: usize, y: usize) -> usize {
+        x + self.dim * y
+    }
+
+    fn to_dual_dim(&self, i: usize) -> (usize, usize) {
+        (i % self.dim, i / self.dim)
+    }
 }
 
 #[cfg(test)]
@@ -150,62 +160,65 @@ mod tests {
     }
 
     #[test]
-    fn toggles_cell() {
+    fn toggles_cell() -> Result<(), OutOfBoundsError> {
         let mut grid = CellGrid::new(8);
-        grid.toggle(4, 2);
+        grid.toggle(4, 2)?;
         assert!(grid.cells[4 + 2 * 8].alive);
-        grid.toggle(4, 2);
+        grid.toggle(4, 2)?;
         assert!(!grid.cells[4 + 2 * 8].alive);
+        Ok(())
     }
 
     #[test]
-    fn counts_alive_neighbors() {
+    fn counts_alive_neighbors() -> Result<(), OutOfBoundsError> {
         // Grid setup (X = dead, O = alive):
         // O X O
         // X O O
         // O X X
         let mut grid = CellGrid::new(3);
-        grid.toggle(0, 0);
-        grid.toggle(2, 0);
-        grid.toggle(1, 1);
-        grid.toggle(2, 1);
-        grid.toggle(0, 2);
+        grid.toggle(0, 0)?;
+        grid.toggle(2, 0)?;
+        grid.toggle(1, 1)?;
+        grid.toggle(2, 1)?;
+        grid.toggle(0, 2)?;
 
         let actual = grid.get_alive_neighbors(4);
         assert_eq!(actual, 4);
+        Ok(())
     }
 
     #[test]
-    fn counts_alive_neighbors_on_edge() {
+    fn counts_alive_neighbors_on_edge() -> Result<(), OutOfBoundsError> {
         // Grid setup (X = dead, O = alive):
         // O X O
         // X O O
         // O X X
         let mut grid = CellGrid::new(3);
-        grid.toggle(0, 0);
-        grid.toggle(2, 0);
-        grid.toggle(1, 1);
-        grid.toggle(2, 1);
-        grid.toggle(0, 2);
+        grid.toggle(0, 0)?;
+        grid.toggle(2, 0)?;
+        grid.toggle(1, 1)?;
+        grid.toggle(2, 1)?;
+        grid.toggle(0, 2)?;
 
         let actual = grid.get_alive_neighbors(2);
         assert_eq!(actual, 2);
+        Ok(())
     }
 
     #[test]
-    fn updates_cells() {
+    fn updates_cells() -> Result<(), OutOfBoundsError> {
         // Grid before update (X = dead, O = alive):
         // O X O X
         // X O O X
         // O X X X
         // X X O X
         let mut grid = CellGrid::new(4);
-        grid.toggle(0, 0);
-        grid.toggle(2, 0);
-        grid.toggle(1, 1);
-        grid.toggle(2, 1);
-        grid.toggle(0, 2);
-        grid.toggle(2, 3);
+        grid.toggle(0, 0)?;
+        grid.toggle(2, 0)?;
+        grid.toggle(1, 1)?;
+        grid.toggle(2, 1)?;
+        grid.toggle(0, 2)?;
+        grid.toggle(2, 3)?;
 
         grid.update();
 
@@ -215,11 +228,12 @@ mod tests {
         // X X O X
         // X X X X
         let mut expected = CellGrid::new(4);
-        expected.toggle(2, 0);
-        expected.toggle(0, 1);
-        expected.toggle(2, 1);
-        expected.toggle(2, 2);
+        expected.toggle(2, 0)?;
+        expected.toggle(0, 1)?;
+        expected.toggle(2, 1)?;
+        expected.toggle(2, 2)?;
         assert_eq!(grid, expected);
+        Ok(())
     }
 
     #[test]
@@ -229,17 +243,40 @@ mod tests {
     }
 
     #[test]
-    fn returns_alive_cells() {
-        let mut grid = CellGrid::new(4);
-        grid.toggle(0, 0);
-        grid.toggle(2, 0);
-        grid.toggle(1, 1);
-        grid.toggle(2, 1);
-        grid.toggle(0, 2);
-        grid.toggle(2, 3);
+    fn returns_cell_states() -> Result<(), OutOfBoundsError> {
+        let mut grid = CellGrid::new(3);
+        grid.toggle(0, 0)?;
+        grid.toggle(2, 0)?;
+        grid.toggle(1, 1)?;
+        grid.toggle(2, 1)?;
+        grid.toggle(0, 2)?;
 
-        let actual = grid.get_alive_cells();
+        let actual = grid.get_states();
 
-        assert_eq!(actual, vec![(0, 0), (2, 0), (1, 1), (2, 1), (0, 2), (2, 3)]);
+        assert_eq!(
+            actual,
+            vec![true, false, true, false, true, true, true, false, false]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn toggle_returns_out_of_bounds_error_x() {
+        let size = 2;
+        let x = 2;
+        let y = 1;
+        let mut grid = CellGrid::new(size);
+
+        assert_eq!(grid.toggle(x, y), Err(OutOfBoundsError { size, x, y }))
+    }
+
+    #[test]
+    fn toggle_returns_out_of_bounds_error_y() {
+        let size = 2;
+        let x = 1;
+        let y = 2;
+        let mut grid = CellGrid::new(size);
+
+        assert_eq!(grid.toggle(x, y), Err(OutOfBoundsError { size, x, y }))
     }
 }

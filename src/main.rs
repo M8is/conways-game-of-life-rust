@@ -13,7 +13,7 @@ use ui::TUI;
 
 fn main() {
     let mut game = Game::new().unwrap();
-    game.run().unwrap();
+    game.run();
 }
 
 struct Game {
@@ -30,45 +30,38 @@ impl Game {
     }
 
     /// Starts the game
-    pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.set_cell_active(0, 3)?;
-        self.set_cell_active(5, 4)?;
-        self.set_cell_active(3, 3)?;
-        self.set_cell_active(5, 6)?;
-        self.set_cell_active(7, 3)?;
-        self.set_cell_active(7, 7)?;
-        self.set_cell_active(4, 7)?;
-        self.set_cell_active(3, 0)?;
-        self.set_cell_active(3, 1)?;
-        self.set_cell_active(3, 2)?;
-        self.set_cell_active(7, 15)?;
-        self.set_cell_active(4, 15)?;
-        self.set_cell_active(3, 10)?;
-        self.set_cell_active(3, 11)?;
-        self.set_cell_active(3, 12)?;
-        self.set_cell_active(12, 12)?;
-        self.set_cell_active(13, 12)?;
-        self.set_cell_active(14, 14)?;
-        self.set_cell_active(13, 15)?;
-        self.set_cell_active(12, 13)?;
+    pub fn run(&mut self) {
+        let alive_cells = [
+            (3, 0),
+            (3, 1),
+            (3, 2),
+            (3, 3),
+            (0, 3),
+            (7, 3),
+            (5, 4),
+            (5, 6),
+            (4, 7),
+            (7, 7),
+            (3, 10),
+            (3, 11),
+            (3, 12),
+            (12, 12),
+            (13, 12),
+            (12, 13),
+            (14, 14),
+            (4, 15),
+            (7, 15),
+            (13, 15),
+        ];
+
+        for (x, y) in alive_cells.iter() {
+            self.grid.toggle(*x, *y).unwrap();
+        }
 
         for _ in 1..16 {
             self.grid.update();
-            self.ui.clear()?;
-            for (x, y) in self.grid.get_alive_cells() {
-                self.ui
-                    .set_point(u16::try_from(x)?, u16::try_from(y)?, true)?;
-            }
-            self.ui.flush()?;
-            thread::sleep(Duration::from_secs(1));
+            self.ui.draw(self.grid.get_states()).unwrap();
+            thread::sleep(Duration::from_millis(500));
         }
-        self.ui.clear()?;
-
-        Ok(())
-    }
-
-    fn set_cell_active(&mut self, x: u16, y: u16) -> Result<(), io::Error> {
-        self.grid.toggle(x as usize, y as usize);
-        Ok(self.ui.set_point(x, y, true)?)
     }
 }
